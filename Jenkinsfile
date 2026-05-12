@@ -9,11 +9,6 @@ pipeline {
         maven 'maven-3.9.6'
     }
 
-    environment {
-        // Asegúrate de que este ID coincida con el que creaste en Jenkins -> Credentials
-        DOCKERHUB_CREDENTIALS = credentials('devops-dockerhub-token')
-    }
-
     stages {
         stage('Packaging') {
             steps {
@@ -24,39 +19,30 @@ pipeline {
 
         stage('Copying war file') {
             steps {
-                echo 'Moving war file to root...'
+                echo 'Moving .war file to root...'
                 sh 'mv target/*.war .'
+            }
+        }
+
+        stage('cleanup') {
+            steps {
+                echo 'Cleaning up old containers...'
+                sh 'docker system prune -a --volumes --force --filter "label=devops-web-project-server"'
             }
         }
 
         stage('build image') {
             steps {
                 echo 'Building Docker image...'
-                // Añadido tu usuario darkisma para que sea válida para Docker Hub
-                sh 'docker build -t darkisma/devops-web-project:v1 --label devops-webproject-server .'
+                sh 'docker build -t darkisma/devops-web-project:v1 --label devops-web-project-server .'
             }
         }
 
-        stage('Docker Hub Login') {
+        stage('run container') {
             steps {
-                echo 'Logging into Docker Hub...'
-                // Comando corregido en una sola línea
-                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+                echo 'Starting container...'
+                sh 'docker run -d --name devops-web-project-server --label devops-web-project-server -p 8081:8080 darkisma/devops-web-project:v1'
             }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                echo 'Pushing image to Docker Hub...'
-                sh 'docker push darkisma/devops-web-project:v1'
-            }
-        }
-    }
-
-    post {
-        always {
-            echo 'Logging out from Docker Hub...'
-            sh 'docker logout'
         }
     }
 }
